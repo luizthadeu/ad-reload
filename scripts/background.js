@@ -41,9 +41,9 @@ function startInterval(tabId) {
           console.log('Ad player found, reloading page...');
           location.href = url;
         } else {
-          const currentVideo = document.querySelector('.ytp-time-current');
+          const currentVideo = document.getElementById('movie_player').getCurrentTime();
           if (currentVideo) {
-            const seconds = currentVideo.textContent.split(':').reduce((acc, time) => (60 * acc) + +time);
+            const seconds = Math.floor(currentVideo);
             chrome.storage.local.set({ videoTimer: seconds });
           }
         }
