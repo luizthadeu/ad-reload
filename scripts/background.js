@@ -26,13 +26,18 @@ function startInterval(tabId) {
     chrome.scripting.executeScript({
       target: { tabId },
       func: async () => {
-        let { videoTimer } = await chrome.storage.local.get('videoTimer');
-        videoTimer = parseInt(videoTimer, 10) || 0;
-
+        
         const videoAdPlayer = document.querySelector('.ad-simple-attributed-string');
-        const url = `${location.href.split('t=')[0]}&t=${videoTimer}s`;
-
+        
         if (videoAdPlayer) {
+          let { videoTimer } = await chrome.storage.local.get('videoTimer');
+          videoTimer = parseInt(videoTimer, 10) || 0;
+          const urlVideo = location.href.split('t=')[0];
+          let timer = (videoTimer > 0)?`t=${videoTimer}`:''
+
+          timer = (!urlVideo.includes('?'))?`?${timer}`:`&${timer}`;
+          
+          const url = `${urlVideo}${timer}`;
           console.log('Ad player found, reloading page...');
           location.href = url;
         } else {
