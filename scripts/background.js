@@ -34,8 +34,9 @@ function startInterval(tabId) {
           videoTimer = parseInt(videoTimer, 10) || 0;
           const urlVideo = location.href.split('t=')[0];
           let timer = (videoTimer > 0)?`t=${videoTimer}`:''
-
-          timer = (!urlVideo.includes('?'))?`?${timer}`:`&${timer}`;
+          if(timer){
+            timer = (!urlVideo.includes('?'))?`?${timer}`:`&${timer}`;
+          }
           
           const url = `${urlVideo}${timer}`;
           console.log('Ad player found, reloading page...');
