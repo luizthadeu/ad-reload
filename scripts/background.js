@@ -29,7 +29,7 @@ function startInterval(tabId) {
         
         const videoAdPlayer = document.querySelector('.ad-simple-attributed-string');
         
-        if (videoAdPlayer) {
+        if (!!videoAdPlayer) {
           let { videoTimer } = await chrome.storage.local.get('videoTimer');
           videoTimer = parseInt(videoTimer, 10) || 0;
           const urlVideo = location.href.split('t=')[0];
@@ -42,15 +42,21 @@ function startInterval(tabId) {
           console.log('Ad player found, reloading page...');
           location.href = url;
         } else {
-          const currentVideo = document.getElementById('movie_player').getCurrentTime();
+
+          // const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+          // const currentVideo = document.getElementById('movie_player')?.getCurrentTime();
+          const currentVideo = document.querySelector('video').currentTime;
+          // console.log("currentVideo: ", currentVideo);
+          // console.log(currentVideo);
           if (currentVideo) {
             const seconds = Math.floor(currentVideo);
             chrome.storage.local.set({ videoTimer: seconds });
           }
+          
         }
       }
     });
-  }, 2000);
+  }, 3000);
 
   console.log('hasInterval: ', intervalId);
   chrome.storage.local.set({ hasInterval: intervalId });
@@ -60,6 +66,7 @@ function startInterval(tabId) {
 chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
   if (changeInfo.status === 'complete' && tab.url && tab.url.startsWith(YOUTUBE_URL)) {
     await chrome.action.setBadgeText({ tabId, text: 'ON' });
+    await chrome.storage.local.set({ videoTimer: 0 });
     startInterval(tabId);
   }
 });
