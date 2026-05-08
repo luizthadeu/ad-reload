@@ -28,11 +28,11 @@ function startInterval(tabId) {
       func: async () => {
         
         const videoAdPlayer = document.querySelector('.ad-simple-attributed-string');
+        const urlVideo = location.href.split('t=')[0];
         
         if (!!videoAdPlayer) {
-          let { videoTimer } = await chrome.storage.local.get('videoTimer');
+          let { [tabId]: videoTimer } = await chrome.storage.local.get(tabId);
           videoTimer = parseInt(videoTimer, 10) || 0;
-          const urlVideo = location.href.split('t=')[0];
           let timer = (videoTimer > 0)?`t=${videoTimer}`:''
           if(timer){
             timer = (!urlVideo.includes('?'))?`?${timer}`:`&${timer}`;
@@ -50,25 +50,36 @@ function startInterval(tabId) {
           // console.log(currentVideo);
           if (currentVideo) {
             const seconds = Math.floor(currentVideo);
-            chrome.storage.local.set({ videoTimer: seconds });
+            chrome.storage.local.set({ [tabId]: seconds });
           }
           
         }
       }
     });
-  }, 3000);
+  }, 2000);
 
   console.log('hasInterval: ', intervalId);
-  chrome.storage.local.set({ hasInterval: intervalId });
+  chrome.storage.local.set({ [`hasInterval-${tabId}`]: intervalId });
 }
 
 // Auto-start ON whenever a YouTube tab finishes loading
 chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
   if (changeInfo.status === 'complete' && tab.url && tab.url.startsWith(YOUTUBE_URL)) {
     await chrome.action.setBadgeText({ tabId, text: 'ON' });
-    await chrome.storage.local.set({ videoTimer: 0 });
+    const urlVideo = tab.url.split('t=')[0];
+    await chrome.storage.local.set({ [urlVideo]: 0 });
     startInterval(tabId);
   }
+});
+
+// Clear interval when the YouTube tab is closed
+chrome.tabs.onRemoved.addListener((tabId) => {
+  chrome.storage.local.get(`hasInterval-${tabId}`, ({ [`hasInterval-${tabId}`]: hasInterval }) => {
+    if (hasInterval) {
+      clearInterval(hasInterval);
+      chrome.storage.local.remove(`hasInterval-${tabId}`);
+    }
+  });
 });
 
 // Allow the user to toggle ON/OFF by clicking the extension action
@@ -82,8 +93,11 @@ chrome.action.onClicked.addListener(async (tab) => {
     if (nextState === 'ON') {
       startInterval(tab.id);
     } else {
-      chrome.storage.local.get('hasInterval', ({ hasInterval }) => {
-        clearInterval(hasInterval);
+      chrome.storage.local.get(`hasInterval-${tab.id}`, ({ [`hasInterval-${tab.id}`]: hasInterval }) => {
+        if (hasInterval) {
+          clearInterval(hasInterval);
+          chrome.storage.local.remove(`hasInterval-${tab.id}`);
+        }
       });
     }
   }
