@@ -12,61 +12,67 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-
-const YOUTUBE_URL = 'https://www.youtube.com/';
+const YOUTUBE_URL = "https://www.youtube.com/";
 
 // Starts the ad-skip interval for the given tab
-function startInterval(tabId) {
+async function startInterval(tabId) {
   // Clear any previously running interval before starting a new one
-  chrome.storage.local.get('hasInterval', ({ hasInterval }) => {
-    if (hasInterval) clearInterval(hasInterval);
-  });
+  let hasInterval = await chrome.storage.local.get(`hasInterval-${tabId}`);
+  if (hasInterval) {
+    clearInterval(hasInterval);
+    chrome.storage.local.remove(`hasInterval-${tabId}`);
+  }
 
   const intervalId = setInterval(() => {
     chrome.scripting.executeScript({
       target: { tabId },
-      func: async () => {
-        
-        const videoAdPlayer = document.querySelector('.ad-simple-attributed-string');
-        const urlVideo = location.href.split('t=')[0];
-        
+      args: [tabId],
+      func: async (tabId) => {
+        const videoAdPlayer = document.querySelector(
+          ".ad-simple-attributed-string",
+        );
+        const urlVideo = location.href.split("t=")[0];
+
         if (!!videoAdPlayer) {
-          let { [tabId]: videoTimer } = await chrome.storage.local.get(tabId);
-          videoTimer = parseInt(videoTimer, 10) || 0;
-          let timer = (videoTimer > 0)?`t=${videoTimer}`:''
-          if(timer){
-            timer = (!urlVideo.includes('?'))?`?${timer}`:`&${timer}`;
+          let { [`videoTimer-${tabId}`]: videoTimer } =
+            await chrome.storage.local.get(`videoTimer-${tabId}`);
+
+          videoTimer = parseInt(videoTimer[`videoTimer-${tabId}`], 10) || 0;
+          let timer = videoTimer > 0 ? `t=${videoTimer}` : "";
+          if (timer) {
+            timer = !urlVideo.includes("?") ? `?${timer}` : `&${timer}`;
           }
-          
+
           const url = `${urlVideo}${timer}`;
-          console.log('Ad player found, reloading page...');
+          console.log("Ad player found, reloading page...");
           location.href = url;
         } else {
-
           // const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
           // const currentVideo = document.getElementById('movie_player')?.getCurrentTime();
-          const currentVideo = document.querySelector('video').currentTime;
+          const currentVideo = document.querySelector("video").currentTime;
           // console.log("currentVideo: ", currentVideo);
           // console.log(currentVideo);
           if (currentVideo) {
             const seconds = Math.floor(currentVideo);
-            chrome.storage.local.set({ [tabId]: seconds });
+            chrome.storage.local.set({ [`videoTimer-${tabId}`]: seconds });
           }
-          
         }
-      }
+      },
     });
   }, 2000);
 
-  console.log('hasInterval: ', intervalId);
   chrome.storage.local.set({ [`hasInterval-${tabId}`]: intervalId });
 }
 
 // Auto-start ON whenever a YouTube tab finishes loading
 chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
-  if (changeInfo.status === 'complete' && tab.url && tab.url.startsWith(YOUTUBE_URL)) {
-    await chrome.action.setBadgeText({ tabId, text: 'ON' });
-    const urlVideo = tab.url.split('t=')[0];
+  if (
+    changeInfo.status === "complete" &&
+    tab.url &&
+    tab.url.startsWith(YOUTUBE_URL)
+  ) {
+    await chrome.action.setBadgeText({ tabId, text: "ON" });
+    const urlVideo = tab.url.split("t=")[0];
     await chrome.storage.local.set({ [urlVideo]: 0 });
     startInterval(tabId);
   }
@@ -74,31 +80,36 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
 
 // Clear interval when the YouTube tab is closed
 chrome.tabs.onRemoved.addListener((tabId) => {
-  chrome.storage.local.get(`hasInterval-${tabId}`, ({ [`hasInterval-${tabId}`]: hasInterval }) => {
-    if (hasInterval) {
-      clearInterval(hasInterval);
-      chrome.storage.local.remove(`hasInterval-${tabId}`);
-    }
-  });
+  chrome.storage.local.get(
+    `hasInterval-${tabId}`,
+    ({ [`hasInterval-${tabId}`]: hasInterval }) => {
+      if (hasInterval) {
+        clearInterval(hasInterval);
+        chrome.storage.local.remove(`hasInterval-${tabId}`);
+      }
+    },
+  );
 });
 
 // Allow the user to toggle ON/OFF by clicking the extension action
 chrome.action.onClicked.addListener(async (tab) => {
+  console.log("tab: ", tab.id);
   if (tab.url && tab.url.startsWith(YOUTUBE_URL)) {
     const prevState = await chrome.action.getBadgeText({ tabId: tab.id });
-    const nextState = prevState === 'ON' ? 'OFF' : 'ON';
+    const nextState = prevState === "ON" ? "OFF" : "ON";
 
     await chrome.action.setBadgeText({ tabId: tab.id, text: nextState });
 
-    if (nextState === 'ON') {
+    if (nextState === "ON") {
       startInterval(tab.id);
     } else {
-      chrome.storage.local.get(`hasInterval-${tab.id}`, ({ [`hasInterval-${tab.id}`]: hasInterval }) => {
-        if (hasInterval) {
-          clearInterval(hasInterval);
-          chrome.storage.local.remove(`hasInterval-${tab.id}`);
-        }
-      });
+      let { [`hasInterval-${tab.id}`]: hasInterval } =
+        await chrome.storage.local.get(`hasInterval-${tab.id}`);
+      if (hasInterval) {
+        clearInterval(hasInterval);
+        chrome.storage.local.remove(`hasInterval-${tab.id}`);
+        chrome.storage.local.remove(`videoTimer-${tab.id}`);
+      }
     }
   }
 });
